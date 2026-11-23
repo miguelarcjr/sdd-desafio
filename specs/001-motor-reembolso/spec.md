@@ -1,6 +1,6 @@
 # Spec — Motor de Cálculo de Reembolso
 
-**Versão:** 1.0 · **Status:** aprovada · **Última alteração:** `2026-11-23`
+**Versão:** 1.1 · **Status:** aprovada · **Última alteração:** `2026-11-23`
 
 > **Regra de ouro deste arquivo:** ele descreve o QUÊ e o PORQUÊ. Nenhuma linha
 > aqui pode citar linguagem, biblioteca, classe, função ou estrutura de pasta.
@@ -183,8 +183,8 @@ Se uma despesa válida couber integralmente no saldo diário disponível da sua 
 
 ### RN-007 — Detecção e recusa de despesas duplicadas
 
-**Regra:** Duas ou mais despesas são consideradas duplicatas quando possuem simultaneamente a mesma chave composta por:
-`(data, categoria_normalizada, fornecedor_normalizado, descricao_normalizada, valor_considerado)`, onde textos normalizados têm espaços extremos removidos e letras convertidas para minúsculas. A primeira ocorrência na ordem da lista é avaliada normalmente; todas as ocorrências subsequentes com a mesma chave são integralmente recusadas (`status = "recusada"`, `valor_reembolsado = 0.00`, `regra_aplicada = "RN-007"`) e não consomem saldo do limite diário.
+**Regra:** Duas ou mais despesas (que já tenham passado pelas validações de valor positivo, período de competência e categoria elegível) são consideradas duplicatas quando possuem simultaneamente a mesma chave composta por:
+`(data, categoria_normalizada, fornecedor_normalizado, descricao_normalizada, valor_considerado)`, onde textos normalizados têm espaços extremos removidos, múltiplos espaços internos colapsados em um único espaço e letras convertidas para minúsculas. A primeira ocorrência válida na ordem da lista é registrada e segue para a validação de nota fiscal; todas as ocorrências subsequentes com a mesma chave são integralmente recusadas (`status = "recusada"`, `valor_reembolsado = 0.00`, `regra_aplicada = "RN-007"`) e não consomem saldo do limite diário.
 **Origem:** Política do RH, item 8 (`AMB-006`).
 **Aceite:** Entre `d-006` e `d-007` (ambas em `2026-07-09`, `alimentacao`, `Bistro Central`, `Almoco`, R$ 54,90), `d-006` é aprovada em R$ 54,90 e `d-007` é recusada com `valor_reembolsado = 0.00` e `regra_aplicada = "RN-007"`.
 
@@ -329,7 +329,7 @@ Para cada despesa:
 2. **Valor Positivo (`RN-008`):** se `valor_considerado <= 0.00` → **RECUSA** (`RN-008`). Para aqui.
 3. **Período de Competência (`RN-006`):** se `data < periodo.inicio` ou `data > periodo.fim` → **RECUSA** (`RN-006`). Para aqui.
 4. **Categoria Elegível (`RN-001`):** se `categoria_normalizada` não estiver em `{"alimentacao", "transporte_urbano", "hospedagem"}` → **RECUSA** (`RN-001`). Para aqui.
-5. **Duplicidade (`RN-007`):** se a chave `(data, categoria_normalizada, fornecedor_normalizado, descricao_normalizada, valor_considerado)` já tiver sido vista anteriormente no lote → **RECUSA** (`RN-007`). Para aqui. (Nota: o registro na tabela de duplicatas vistas ocorre antes da validação de NF ou após a validação de categoria, garantindo que duplicatas idênticas sejam barradas como `RN-007`).
+5. **Duplicidade (`RN-007`):** para despesas que passaram pelas etapas 2, 3 e 4, constrói-se a chave `(data, categoria_normalizada, fornecedor_normalizado, descricao_normalizada, valor_considerado)` (com colapso de espaços internos múltiplos e minúsculas). Se a chave já tiver sido registrada anteriormente no lote → **RECUSA** (`RN-007`). Para aqui. Caso contrário, registra a chave na tabela de duplicatas vistas e avança para a etapa 6.
 6. **Nota Fiscal Obrigatória (`RN-004`):** se `valor_considerado > 100.00` e `tem_nota_fiscal == false` → **RECUSA** (`RN-004`). Para aqui.
 
 ### Fase B — Determinação de Dias em Viagem e Aplicação de Limites Diários
