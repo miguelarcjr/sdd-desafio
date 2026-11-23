@@ -34,10 +34,10 @@
   - **Aceite:** Testes em `tests/duplicates-and-invoice.test.ts` passam (aprova 1ª ocorrência `d-006` e recusa 2ª `d-007` com `RN-007`; aceita R$ 100,00 sem NF `d-003` e recusa R$ 100,01 sem NF `d-004` com `RN-004`)
   - **Commit:** `de9d260`
 
-- [ ] **T-005** — Implementar Fase B do motor: detecção de dias em viagem (+50% via hospedagem válida, `RN-005`), consumo de limites diários agregados (`RN-002`), reembolso parcial (`RN-003`) e consolidação do resumo do lote
+- [x] **T-005** — Implementar Fase B do motor: detecção de dias em viagem (+50% via hospedagem válida, `RN-005`), consumo de limites diários agregados (`RN-002`), reembolso parcial (`RN-003`) e consolidação do resumo do lote
   - **Atende:** RN-002, RN-003, RN-005, AMB-001, AMB-002, AMB-003, AMB-004
   - **Aceite:** Testes em `tests/daily-limits-and-travel.test.ts` passam (`d-001` recebe R$ 60,00 `parcial` com `RN-003` e `d-002` recebe R$ 0,00 `recusada` com `RN-002`; `d-010` ativa viagem em `2026-07-14` e recebe R$ 375,00 `parcial`; `d-013` sem NF é recusada por `RN-004` e não ativa viagem)
-  - **Commit:** `<pendente>`
+  - **Commit:** `7a50b16`
 
 ## Fase 3 — Casos de borda
 
