@@ -12,10 +12,10 @@
 
 ## Fase 1 — Fundação
 
-- [ ] **T-001** — Configurar projeto Node.js/TypeScript, Vitest, tipos de domínio (`src/domain/types.ts`) e configuração declarativa da política (`src/domain/policy.ts`)
+- [x] **T-001** — Configurar projeto Node.js/TypeScript, Vitest, tipos de domínio (`src/domain/types.ts`) e configuração declarativa da política (`src/domain/policy.ts`)
   - **Atende:** Estrutura base do `plan.md` (Seções 1, 3 e 4) e contratos da Seção 4 da `spec.md`
   - **Aceite:** `npm run typecheck` e `npm test` executam com sucesso validando `tests/policy.test.ts` (verifica limites base de R$ 60, R$ 80, R$ 250, isenção de NF em R$ 100 e multiplicador de viagem de 150%)
-  - **Commit:** `<pendente>`
+  - **Commit:** `3cc17a2`
 
 - [ ] **T-002** — Implementar módulo de aritmética monetária em centavos com arredondamento Half-Up (`src/domain/money.ts`) e normalização textual/categorias (`src/domain/normalizer.ts`)
   - **Atende:** RN-009, RN-010, AMB-008, AMB-009, D-001
