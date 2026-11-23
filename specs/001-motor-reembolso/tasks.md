@@ -29,10 +29,10 @@
   - **Aceite:** Testes em `tests/eliminatory-rules.test.ts` passam (recusa `valor <= 0` com `RN-008` e `valor_glosado = 0`, recusa data fora de `[inicio, fim]` com `RN-006`, aceita sábado dentro da competência, e recusa categoria `"coworking"` com `RN-001`)
   - **Commit:** `84bbb8c`
 
-- [ ] **T-004** — Implementar detecção de duplicatas (`RN-007`) e validação de obrigatoriedade de nota fiscal acima de R$ 100,00 (`RN-004`) na Fase A do motor
+- [x] **T-004** — Implementar detecção de duplicatas (`RN-007`) e validação de obrigatoriedade de nota fiscal acima de R$ 100,00 (`RN-004`) na Fase A do motor
   - **Atende:** RN-004, RN-007, AMB-005, AMB-006, AMB-011, D-001
   - **Aceite:** Testes em `tests/duplicates-and-invoice.test.ts` passam (aprova 1ª ocorrência `d-006` e recusa 2ª `d-007` com `RN-007`; aceita R$ 100,00 sem NF `d-003` e recusa R$ 100,01 sem NF `d-004` com `RN-004`)
-  - **Commit:** `<pendente>`
+  - **Commit:** `de9d260`
 
 - [ ] **T-005** — Implementar Fase B do motor: detecção de dias em viagem (+50% via hospedagem válida, `RN-005`), consumo de limites diários agregados (`RN-002`), reembolso parcial (`RN-003`) e consolidação do resumo do lote
   - **Atende:** RN-002, RN-003, RN-005, AMB-001, AMB-002, AMB-003, AMB-004

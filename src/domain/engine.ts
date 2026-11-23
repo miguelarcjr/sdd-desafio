@@ -1,6 +1,11 @@
 import { formatBRL, fromCents, toCentsHalfUp } from "./money.js";
 import { construirChaveDuplicata, normalizarCategoria } from "./normalizer.js";
-import { DEFAULT_POLICY, isCategoriaElegivel, type PolicyConfig } from "./policy.js";
+import {
+  DEFAULT_POLICY,
+  isCategoriaElegivel,
+  obterLimiteDiarioCents,
+  type PolicyConfig,
+} from "./policy.js";
 import type {
   AvaliacaoDespesa,
   CategoriaElegivel,
@@ -10,6 +15,7 @@ import type {
   LoteEntrada,
   Periodo,
   ResultadoLote,
+  ResumoLote,
 } from "./types.js";
 
 export interface ItemPreProcessado {
@@ -101,20 +107,18 @@ export function executarFaseAEliminatoria(
   periodo: Periodo,
   policy: PolicyConfig = DEFAULT_POLICY
 ): ResultadoFaseA[] {
-  const chavesVistas = new Map<string, string>(); // chave -> id da 1a ocorrencia
+  const chavesVistas = new Map<string, string>();
   const resultados: ResultadoFaseA[] = [];
 
   for (const despesa of despesas) {
     const item = preProcessarDespesa(despesa);
 
-    // Etapas 2, 3 e 4
     const falhaInicial = validarRegrasEliminatoriasIniciais(item, periodo);
     if (falhaInicial) {
       resultados.push({ item, falha: falhaInicial });
       continue;
     }
 
-    // Etapa 5: Duplicidade (RN-007 / D-001)
     const chave = construirChaveDuplicata(despesa, item.valorConsideradoCents);
     const idOriginal = chavesVistas.get(chave);
     if (idOriginal !== undefined) {
@@ -129,7 +133,6 @@ export function executarFaseAEliminatoria(
     }
     chavesVistas.set(chave, despesa.id);
 
-    // Etapa 6: Nota fiscal (RN-004)
     const falhaNF = validarNotaFiscal(item, policy);
     if (falhaNF) {
       resultados.push({ item, falha: falhaNF });
@@ -140,6 +143,149 @@ export function executarFaseAEliminatoria(
   }
 
   return resultados;
+}
+
+/**
+ * Identifica todas as datas com pelo menos uma despesa de categoria trigger de viagem
+ * (ex: "hospedagem") que tenha sobrevivido a Fase A eliminatoria (RN-005 / AMB-004).
+ */
+export function identificarDatasEmViagem(
+  resultadosFaseA: ReadonlyArray<ResultadoFaseA>,
+  policy: PolicyConfig = DEFAULT_POLICY
+): Set<string> {
+  const datasEmViagem = new Set<string>();
+  const triggers = new Set<string>(policy.categoriasTriggerViagem);
+
+  for (const { item, falha } of resultadosFaseA) {
+    if (falha === null && triggers.has(item.categoriaNormalizada)) {
+      datasEmViagem.add(item.despesa.data.trim());
+    }
+  }
+
+  return datasEmViagem;
+}
+
+/**
+ * Executa o motor completo de calculo de reembolso (Fase A + Fase B + Resumo) (T-005).
+ */
+export function calcularReembolsos(
+  lote: LoteEntrada,
+  policy: PolicyConfig = DEFAULT_POLICY
+): ResultadoLote {
+  const resultadosFaseA = executarFaseAEliminatoria(
+    lote.despesas,
+    lote.periodo,
+    policy
+  );
+  const datasEmViagem = identificarDatasEmViagem(resultadosFaseA, policy);
+
+  // Mapa de saldo restante em centavos por chave "AAAA-MM-DD|categoria"
+  const saldosDiarios = new Map<string, Cents>();
+  const avaliacoes: AvaliacaoDespesa[] = [];
+
+  let quantidadeAprovadas = 0;
+  let quantidadeParciais = 0;
+  let quantidadeRecusadas = 0;
+  let totalSolicitadoCents = 0;
+  let totalReembolsadoCents = 0;
+
+  for (const { item, falha } of resultadosFaseA) {
+    const dataLimpa = item.despesa.data.trim();
+    const emViagem = datasEmViagem.has(dataLimpa);
+    totalSolicitadoCents += item.valorConsideradoCents;
+
+    if (falha !== null) {
+      quantidadeRecusadas += 1;
+      avaliacoes.push(
+        criarAvaliacaoRecusada(item, falha.regra, falha.justificativa, emViagem)
+      );
+      continue;
+    }
+
+    const categoria = item.categoriaNormalizada as CategoriaElegivel;
+    const limiteDiarioCents = obterLimiteDiarioCents(categoria, emViagem, policy);
+    const chaveDiaCategoria = `${dataLimpa}|${categoria}`;
+
+    const saldoDisponivelCents =
+      saldosDiarios.get(chaveDiaCategoria) ?? limiteDiarioCents;
+
+    if (saldoDisponivelCents === 0) {
+      quantidadeRecusadas += 1;
+      avaliacoes.push(
+        criarAvaliacaoRecusada(
+          item,
+          "RN-002",
+          `Limite diario de ${formatBRL(limiteDiarioCents)} para '${categoria}' na data ${dataLimpa} ja foi integralmente consumido por despesas anteriores.`,
+          emViagem
+        )
+      );
+      continue;
+    }
+
+    if (item.valorConsideradoCents <= saldoDisponivelCents) {
+      const novoSaldo = saldoDisponivelCents - item.valorConsideradoCents;
+      saldosDiarios.set(chaveDiaCategoria, novoSaldo);
+      quantidadeAprovadas += 1;
+      totalReembolsadoCents += item.valorConsideradoCents;
+
+      const valorConsiderado = fromCents(item.valorConsideradoCents);
+      const sufixoViagem = emViagem ? " (limite ampliado em 50% por dia em viagem)" : "";
+
+      avaliacoes.push({
+        id: item.despesa.id,
+        data: item.despesa.data,
+        categoria_original: item.despesa.categoria,
+        categoria_normalizada: item.categoriaNormalizada,
+        valor_original: item.despesa.valor,
+        valor_considerado: valorConsiderado,
+        valor_reembolsado: valorConsiderado,
+        valor_glosado: 0,
+        status: "aprovada",
+        em_viagem: emViagem,
+        regra_aplicada: "RN-002",
+        justificativa: `Despesa aprovada integralmente dentro do limite diario de ${formatBRL(limiteDiarioCents)} para '${categoria}'${sufixoViagem}.`,
+      });
+    } else {
+      const reembolsadoCents = saldoDisponivelCents;
+      const glosadoCents = item.valorConsideradoCents - reembolsadoCents;
+      saldosDiarios.set(chaveDiaCategoria, 0);
+      quantidadeParciais += 1;
+      totalReembolsadoCents += reembolsadoCents;
+
+      const sufixoViagem = emViagem ? " (limite ampliado em 50% por dia em viagem)" : "";
+
+      avaliacoes.push({
+        id: item.despesa.id,
+        data: item.despesa.data,
+        categoria_original: item.despesa.categoria,
+        categoria_normalizada: item.categoriaNormalizada,
+        valor_original: item.despesa.valor,
+        valor_considerado: fromCents(item.valorConsideradoCents),
+        valor_reembolsado: fromCents(reembolsadoCents),
+        valor_glosado: fromCents(glosadoCents),
+        status: "parcial",
+        em_viagem: emViagem,
+        regra_aplicada: "RN-003",
+        justificativa: `Despesa excede o saldo diario disponivel de ${formatBRL(reembolsadoCents)} (teto de ${formatBRL(limiteDiarioCents)} para '${categoria}'${sufixoViagem}); reembolsado parcialmente ate o teto e glosado o excedente de ${formatBRL(glosadoCents)}.`,
+      });
+    }
+  }
+
+  const resumo: ResumoLote = {
+    total_despesas: lote.despesas.length,
+    quantidade_aprovadas: quantidadeAprovadas,
+    quantidade_parciais: quantidadeParciais,
+    quantidade_recusadas: quantidadeRecusadas,
+    valor_total_solicitado: fromCents(totalSolicitadoCents),
+    valor_total_reembolsado: fromCents(totalReembolsadoCents),
+  };
+
+  return {
+    colaborador: { ...lote.colaborador },
+    periodo: { ...lote.periodo },
+    resumo,
+    avaliacoes,
+  };
 }
 
 export function preProcessarDespesa(despesa: DespesaInput): ItemPreProcessado {
