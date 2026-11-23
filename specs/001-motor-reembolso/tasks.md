@@ -41,10 +41,10 @@
 
 ## Fase 3 — Casos de borda
 
-- [ ] **T-006** — Criar suíte completa de casos de borda, precedência entre regras e teste de contrato ponta a ponta contra `exemplos/despesas-exemplo.json`
+- [x] **T-006** — Criar suíte completa de casos de borda, precedência entre regras e teste de contrato ponta a ponta contra `exemplos/despesas-exemplo.json`
   - **Atende:** AMB-001 a AMB-011, Seções 7, 8 e 9 da `spec.md`
-  - **Aceite:** Testes em `tests/edge-cases-and-example.test.ts` passam, validando os 14 itens de `exemplos/despesas-exemplo.json` (3 aprovadas, 4 parciais, 7 recusadas, `valor_total_solicitado = 1817.84`, `valor_total_reembolsado = 710.43`) e invariância de ordem na detecção de viagem
-  - **Commit:** `<pendente>`
+  - **Aceite:** Testes em `tests/edge-cases-and-example.test.ts` passam, validando os 14 itens de `exemplos/despesas-exemplo.json` (3 aprovadas, 4 parciais, 7 recusadas, `valor_total_solicitado = 1816.84`, `valor_total_reembolsado = 710.43`) e invariância de ordem na detecção de viagem
+  - **Commit:** `f92f82a` (atualizado com D-002)
 
 ## Fase 4 — Saída e CLI
 

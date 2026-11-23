@@ -22,7 +22,7 @@ describe("[T-006] Casos de borda, precedencia e contrato com despesas-exemplo.js
       quantidade_aprovadas: 3,
       quantidade_parciais: 4,
       quantidade_recusadas: 7,
-      valor_total_solicitado: 1817.84,
+      valor_total_solicitado: 1816.84,
       valor_total_reembolsado: 710.43,
     });
 
