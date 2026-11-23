@@ -10,6 +10,24 @@ Ordem cronológica inversa: a mais recente primeiro.
 
 ---
 
+## D-002 — Correção do valor esperado de `valor_total_solicitado` na Seção 9 (`exemplos/despesas-exemplo.json`) · `2026-11-23`
+
+**Gatilho:** Falha no teste de contrato `T-006` (`tests/edge-cases-and-example.test.ts`), que calculou `1816.84` contra `1817.84` documentado na Seção 9 da `spec.md`.
+
+**O que mudou na spec:**
+- **De (`spec.md` v1.1, Seção 9):** `valor_total_solicitado` exato de **1817.84**.
+- **Para (`spec.md` v1.2, Seção 9):** `valor_total_solicitado` exato de **1816.84** (`72.50 + 38.00 + 100.00 + 100.01 + 89.00 + 54.90 + 54.90 + 41.00 - 45.00 + 480.00 + 33.33 + 47.20 + 690.00 + 61.00`).
+
+**Por quê:** A soma manual feita durante a elaboração inicial da spec v1.0 tinha um erro aritmético de R$ 1,00 a mais. O cálculo do motor revelou a divergência antes da entrega.
+
+**O que isso invalidou:** Apenas o número esperado no critério de aceite da Seção 9 e no teste de contrato `T-006`. Nenhuma regra de negócio mudou.
+
+**Tasks afetadas:** `T-006`.
+
+**Custo:** 2 arquivos editados (`spec.md` e `tests/edge-cases-and-example.test.ts`), ~2 minutos.
+
+---
+
 ## D-001 — Refinamento da chave e momento de registro de duplicatas (`RN-007`) · `2026-11-23`
 
 **Gatilho:** Ambiguidade que apareceu ao desenhar o modelo de dados e a assinatura de normalização no `plan.md` (a nota da Seção 8 da `spec.md` v1.0 deixava em aberto se o registro na tabela de duplicatas ocorria antes da validação de NF ou após a validação de categoria, e não especificava o tratamento de múltiplos espaços internos em `fornecedor` e `descricao`).

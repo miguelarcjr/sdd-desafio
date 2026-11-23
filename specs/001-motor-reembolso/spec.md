@@ -1,6 +1,6 @@
 # Spec — Motor de Cálculo de Reembolso
 
-**Versão:** 1.1 · **Status:** aprovada · **Última alteração:** `2026-11-23`
+**Versão:** 1.2 · **Status:** aprovada · **Última alteração:** `2026-11-23`
 
 > **Regra de ouro deste arquivo:** ele descreve o QUÊ e o PORQUÊ. Nenhuma linha
 > aqui pode citar linguagem, biblioteca, classe, função ou estrutura de pasta.
@@ -347,7 +347,7 @@ O sistema está pronto quando:
 
 - [ ] Processa o arquivo `exemplos/despesas-exemplo.json` via linha de comando (`calcular --input ... --output ...`) gerando um arquivo JSON válido com 14 avaliações na mesma ordem da entrada.
 - [ ] Produz para `exemplos/despesas-exemplo.json` exatamente: 3 despesas `"aprovada"` (`d-006`, `d-011`, `d-012`), 4 despesas `"parcial"` (`d-001`, `d-003`, `d-010`, `d-014`) e 7 despesas `"recusada"` (`d-002`, `d-004`, `d-005`, `d-007`, `d-008`, `d-009`, `d-013`).
-- [ ] Produz para `exemplos/despesas-exemplo.json` o `valor_total_reembolsado` exato de **710.43** (`60.00 + 80.00 + 54.90 + 375.00 + 33.33 + 47.20 + 60.00`) e `valor_total_solicitado` exato de **1817.84**.
+- [ ] Produz para `exemplos/despesas-exemplo.json` o `valor_total_reembolsado` exato de **710.43** (`60.00 + 80.00 + 54.90 + 375.00 + 33.33 + 47.20 + 60.00`) e `valor_total_solicitado` exato de **1816.84**.
 - [ ] Cada uma das 10 regras de negócio (`RN-001` a `RN-010`) e cada uma das 11 ambiguidades (`AMB-001` a `AMB-011`) possui ao menos um teste automatizado dedicado verificando seu comportamento e código de regra.
 - [ ] Nenhum cálculo monetário apresenta erro de precisão de ponto flutuante (todos os valores monetários de saída possuem precisão exata de até 2 casas decimais).
 
