@@ -48,10 +48,10 @@
 
 ## Fase 4 — Saída e CLI
 
-- [ ] **T-007** — Implementar validação de schema de entrada, leitura/escrita de arquivos JSON (`src/io/schema.ts`, `src/io/file-io.ts`), CLI (`src/cli/index.ts`) com comando `calcular --input <arq> --output <arq>` e atualizar `README.md`
+- [x] **T-007** — Implementar validação de schema de entrada, leitura/escrita de arquivos JSON (`src/io/schema.ts`, `src/io/file-io.ts`), CLI (`src/cli/index.ts`) com comando `calcular --input <arq> --output <arq>` e atualizar `README.md`
   - **Atende:** Interface CLI fixa do `DESAFIO.md` e Seção 4 da `spec.md`
   - **Aceite:** Testes em `tests/cli-and-io.test.ts` passam e a execução real via linha de comando `npm run reembolso -- calcular --input exemplos/despesas-exemplo.json --output resultado.json` gera o JSON válido esperado
-  - **Commit:** `<pendente>`
+  - **Commit:** `67f2fd6`
 
 ---
 
