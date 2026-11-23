@@ -24,10 +24,10 @@
 
 ## Fase 2 — Regras de negócio
 
-- [ ] **T-003** — Implementar validações eliminatórias de valor positivo (`RN-008`), período de competência (`RN-006`) e categoria elegível (`RN-001`) no motor de domínio (`src/domain/engine.ts`)
+- [x] **T-003** — Implementar validações eliminatórias de valor positivo (`RN-008`), período de competência (`RN-006`) e categoria elegível (`RN-001`) no motor de domínio (`src/domain/engine.ts`)
   - **Atende:** RN-001, RN-006, RN-008, AMB-007, AMB-010
   - **Aceite:** Testes em `tests/eliminatory-rules.test.ts` passam (recusa `valor <= 0` com `RN-008` e `valor_glosado = 0`, recusa data fora de `[inicio, fim]` com `RN-006`, aceita sábado dentro da competência, e recusa categoria `"coworking"` com `RN-001`)
-  - **Commit:** `<pendente>`
+  - **Commit:** `84bbb8c`
 
 - [ ] **T-004** — Implementar detecção de duplicatas (`RN-007`) e validação de obrigatoriedade de nota fiscal acima de R$ 100,00 (`RN-004`) na Fase A do motor
   - **Atende:** RN-004, RN-007, AMB-005, AMB-006, AMB-011, D-001

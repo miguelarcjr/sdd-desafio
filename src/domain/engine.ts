@@ -1,5 +1,5 @@
 import { formatBRL, fromCents, toCentsHalfUp } from "./money.js";
-import { normalizarCategoria } from "./normalizer.js";
+import { construirChaveDuplicata, normalizarCategoria } from "./normalizer.js";
 import { DEFAULT_POLICY, isCategoriaElegivel, type PolicyConfig } from "./policy.js";
 import type {
   AvaliacaoDespesa,
@@ -21,6 +21,11 @@ export interface ItemPreProcessado {
 export interface FalhaEliminatoria {
   regra: CodigoRegra;
   justificativa: string;
+}
+
+export interface ResultadoFaseA {
+  item: ItemPreProcessado;
+  falha: FalhaEliminatoria | null;
 }
 
 export function estaDentroDoPeriodo(data: string, periodo: Periodo): boolean {
@@ -60,6 +65,81 @@ export function validarRegrasEliminatoriasIniciais(
   }
 
   return null;
+}
+
+/**
+ * Avalia obrigatoriedade de nota fiscal (RN-004 / AMB-005):
+ * Exigida estritamente acima do limite de isencao (R$ 100,00 = 10000 centavos).
+ */
+export function validarNotaFiscal(
+  item: ItemPreProcessado,
+  policy: PolicyConfig = DEFAULT_POLICY
+): FalhaEliminatoria | null {
+  if (
+    item.valorConsideradoCents > policy.limiteIsencaoNotaFiscalCents &&
+    !item.despesa.tem_nota_fiscal
+  ) {
+    return {
+      regra: "RN-004",
+      justificativa: `Despesa de ${formatBRL(item.valorConsideradoCents)} acima de ${formatBRL(policy.limiteIsencaoNotaFiscalCents)} exige nota fiscal obrigatoria.`,
+    };
+  }
+  return null;
+}
+
+/**
+ * Executa toda a Fase A (T-003 + T-004) sobre o lote de despesas:
+ * 1. Pre-processamento (RN-009, RN-010)
+ * 2. Valor positivo (RN-008)
+ * 3. Periodo de competencia (RN-006)
+ * 4. Categoria elegivel (RN-001)
+ * 5. Duplicidade (RN-007 / AMB-006 / D-001)
+ * 6. Nota fiscal obrigatoria (RN-004 / AMB-005)
+ */
+export function executarFaseAEliminatoria(
+  despesas: ReadonlyArray<DespesaInput>,
+  periodo: Periodo,
+  policy: PolicyConfig = DEFAULT_POLICY
+): ResultadoFaseA[] {
+  const chavesVistas = new Map<string, string>(); // chave -> id da 1a ocorrencia
+  const resultados: ResultadoFaseA[] = [];
+
+  for (const despesa of despesas) {
+    const item = preProcessarDespesa(despesa);
+
+    // Etapas 2, 3 e 4
+    const falhaInicial = validarRegrasEliminatoriasIniciais(item, periodo);
+    if (falhaInicial) {
+      resultados.push({ item, falha: falhaInicial });
+      continue;
+    }
+
+    // Etapa 5: Duplicidade (RN-007 / D-001)
+    const chave = construirChaveDuplicata(despesa, item.valorConsideradoCents);
+    const idOriginal = chavesVistas.get(chave);
+    if (idOriginal !== undefined) {
+      resultados.push({
+        item,
+        falha: {
+          regra: "RN-007",
+          justificativa: `Despesa duplicada em relacao ao lancamento '${idOriginal}' (${despesa.data}, ${item.categoriaNormalizada}, ${formatBRL(item.valorConsideradoCents)}).`,
+        },
+      });
+      continue;
+    }
+    chavesVistas.set(chave, despesa.id);
+
+    // Etapa 6: Nota fiscal (RN-004)
+    const falhaNF = validarNotaFiscal(item, policy);
+    if (falhaNF) {
+      resultados.push({ item, falha: falhaNF });
+      continue;
+    }
+
+    resultados.push({ item, falha: null });
+  }
+
+  return resultados;
 }
 
 export function preProcessarDespesa(despesa: DespesaInput): ItemPreProcessado {
