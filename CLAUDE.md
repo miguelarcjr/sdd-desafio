@@ -1,10 +1,5 @@
 # CLAUDE.md
 
-> Este arquivo é lido pelo Claude Code no início de toda sessão. É onde moram as
-> convenções que você não quer repetir em todo prompt.
-> Substitua os `<...>` e apague o que não usar. Mantenha curto — CLAUDE.md longo
-> é CLAUDE.md ignorado.
-
 ## O projeto
 
 Motor de cálculo de reembolso de despesas corporativas. CLI que lê um JSON de
@@ -34,16 +29,23 @@ Se o que eu pedi não está coberto por nenhuma task, me avise em vez de impleme
 
 ## Stack e comandos
 
-- Linguagem: `<...>`
-- Rodar: `<comando>`
-- Testes: `<comando>`
-- Lint/format: `<comando>`
+- Linguagem: TypeScript (Node.js >= 20, ESM)
+- Rodar: `npm run reembolso -- calcular --input exemplos/despesas-exemplo.json --output resultado.json`
+- Testes: `npm test` (Vitest)
+- Lint/format: `npm run typecheck` (`tsc --noEmit`)
 
 ## Convenções de código
 
-- `<nomenclatura, estrutura de pastas, tratamento de erro, o que for relevante>`
-- Valores monetários: `<como são representados — decimal, centavos em inteiro, etc.>`
+- Estrutura de pastas:
+  - `src/domain/`: núcleo puro de regras de negócio, modelos, política e aritmética monetária (zero I/O).
+  - `src/io/`: leitura/escrita de arquivos JSON e validação de schema de entrada.
+  - `src/cli/`: ponto de entrada da linha de comando (`calcular --input ... --output ...`).
+  - `tests/`: testes automatizados mapeados diretamente para `RN-NNN` e `AMB-NNN`.
+- Valores monetários: representados internamente em **centavos inteiros** (`number` inteiro após arredondamento Half-Up da entrada para 2 casas decimais), convertidos de volta para número com 2 casas decimais apenas na serialização de saída. Nunca usar ponto flutuante binário (`float`) em somas ou subtrações de limites.
 
 ## Fora de escopo
 
-- `<o que este projeto explicitamente não faz — evita que o agente invente feature>`
+- Persistência em banco de dados, chamadas de rede/APIs externas ou interface gráfica/web.
+- Conversão de moedas estrangeiras ou cálculo de impostos.
+- Inferência de quantidade de diárias via interpretação de texto livre (NLP/regex) no campo `descricao`.
+- Autenticação, controle de acesso ou envio de notificações.
