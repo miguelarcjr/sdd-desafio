@@ -57,10 +57,10 @@
 
 ## Fase 5 — Envelope (Dia 2 — Política v4 / `D-003`)
 
-- [ ] **T-008** — Evoluir tipos de domínio e política declarativa (`src/domain/types.ts`, `src/domain/policy.ts`) para suportar categorias dinâmicas, política por centro de custo (`padrao` + `centrosCusto`, `limite == 0` inelegível) e limiar de aprovação manual (R$ 500,00)
+- [x] **T-008** — Evoluir tipos de domínio e política declarativa (`src/domain/types.ts`, `src/domain/policy.ts`) para suportar categorias dinâmicas, política por centro de custo (`padrao` + `centrosCusto`, `limite == 0` inelegível) e limiar de aprovação manual (R$ 500,00)
   - **Atende:** RN-001, RN-011, RN-013, AMB-012, AMB-013, AMB-018, D-003
   - **Aceite:** Testes em `tests/policy.test.ts` passam cobrindo `CC-COMERCIAL` (`representacao`), `CC-ENG-PLATAFORMA` (`hospedagem: 0` inelegível), `CC-ADM` (herança de `padrao`) e `CC-SUPORTE-N2` (fallback para `padrao`)
-  - **Commit:** `<pendente>`
+  - **Commit:** `5769ae5`
 
 - [ ] **T-009** — Implementar módulo puro de conversão cambial com fallback para último dia útil anterior (`src/domain/exchange.ts`)
   - **Atende:** RN-012, AMB-014, AMB-015, D-003
