@@ -62,10 +62,10 @@
   - **Aceite:** Testes em `tests/policy.test.ts` passam cobrindo `CC-COMERCIAL` (`representacao`), `CC-ENG-PLATAFORMA` (`hospedagem: 0` inelegível), `CC-ADM` (herança de `padrao`) e `CC-SUPORTE-N2` (fallback para `padrao`)
   - **Commit:** `5769ae5`
 
-- [ ] **T-009** — Implementar módulo puro de conversão cambial com fallback para último dia útil anterior (`src/domain/exchange.ts`)
+- [x] **T-009** — Implementar módulo puro de conversão cambial com fallback para último dia útil anterior (`src/domain/exchange.ts`)
   - **Atende:** RN-012, AMB-014, AMB-015, D-003
   - **Aceite:** Testes em `tests/exchange.test.ts` passam cobrindo `BRL` (taxa 1), `EUR`/`USD` em dia útil, sábado `2026-07-18` usando sexta `2026-07-17` (`5.96`), e moeda ausente `GBP` retornando `null`
-  - **Commit:** `<pendente>`
+  - **Commit:** `9ae4b50`
 
 - [ ] **T-010** — Integrar política por CC (`RN-011`), conversão cambial (`RN-012`), viagem internacional (`RN-005`/`AMB-017`) e fila de aprovação manual > R$ 500 (`RN-013`) no motor (`src/domain/engine.ts`)
   - **Atende:** RN-001, RN-004, RN-005, RN-011, RN-012, RN-013, AMB-012 a AMB-018, D-003

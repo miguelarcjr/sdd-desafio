@@ -21,9 +21,11 @@ describe("[T-006] Casos de borda, precedencia e contrato com despesas-exemplo.js
       total_despesas: 14,
       quantidade_aprovadas: 3,
       quantidade_parciais: 4,
+      quantidade_pendentes_aprovacao: 0,
       quantidade_recusadas: 7,
       valor_total_solicitado: 1816.84,
       valor_total_reembolsado: 710.43,
+      valor_total_pendente_aprovacao: 0,
     });
 
     const porId = new Map(resultado.avaliacoes.map((a) => [a.id, a]));
