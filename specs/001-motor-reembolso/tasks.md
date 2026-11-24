@@ -67,15 +67,15 @@
   - **Aceite:** Testes em `tests/exchange.test.ts` passam cobrindo `BRL` (taxa 1), `EUR`/`USD` em dia útil, sábado `2026-07-18` usando sexta `2026-07-17` (`5.96`), e moeda ausente `GBP` retornando `null`
   - **Commit:** `9ae4b50`
 
-- [ ] **T-010** — Integrar política por CC (`RN-011`), conversão cambial (`RN-012`), viagem internacional (`RN-005`/`AMB-017`) e fila de aprovação manual > R$ 500 (`RN-013`) no motor (`src/domain/engine.ts`)
+- [x] **T-010** — Integrar política por CC (`RN-011`), conversão cambial (`RN-012`), viagem internacional (`RN-005`/`AMB-017`) e fila de aprovação manual > R$ 500 (`RN-013`) no motor (`src/domain/engine.ts`)
   - **Atende:** RN-001, RN-004, RN-005, RN-011, RN-012, RN-013, AMB-012 a AMB-018, D-003
   - **Aceite:** Todos os testes anteriores (v3) continuam passando e os novos testes em `tests/envelope-v4.test.ts` validam 100% de `despesas-envelope.json` (`828.72` reembolsado + `600.00` pendente) e `despesas-envelope-cc-desconhecido.json` (`433.76` reembolsado)
-  - **Commit:** `<pendente>`
+  - **Commit:** `80a5b3f`
 
-- [ ] **T-011** — Implementar loaders externos de política e câmbio (`src/io/policy-io.ts`, `src/io/exchange-io.ts`), flags opcionais `--policy` e `--cambio` na CLI (`src/cli/index.ts`), suporte a `moeda` opcional no schema (`src/io/schema.ts`) e atualizar `README.md`
+- [x] **T-011** — Implementar loaders externos de política e câmbio (`src/io/policy-io.ts`, `src/io/exchange-io.ts`), flags opcionais `--policy` e `--cambio` na CLI (`src/cli/index.ts`), suporte a `moeda` opcional no schema (`src/io/schema.ts`) e atualizar `README.md`
   - **Atende:** Política v4 (Itens A e B), retrocompatibilidade da CLI v3, `D-003`
   - **Aceite:** Testes em `tests/cli-and-io.test.ts` passam e execução real da CLI com `--policy exemplos/envelope/politica-v4.json --cambio exemplos/envelope/cambio.json` produz a saída exata esperada para ambos os arquivos do envelope
-  - **Commit:** `<pendente>`
+  - **Commit:** `26c5f13`
 
 ---
 

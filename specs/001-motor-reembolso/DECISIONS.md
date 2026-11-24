@@ -30,7 +30,7 @@ Ordem cronológica inversa: a mais recente primeiro.
 
 **Tasks afetadas:** Criadas novas tasks na Fase 5 de `tasks.md`: `T-008`, `T-009`, `T-010` e `T-011`.
 
-**Custo:** Será medido e reportado no `RELATORIO.md` após a conclusão das tasks `T-008` a `T-011`.
+**Custo:** ~10 minutos de execução end-to-end; 8 arquivos de código tocados/criados em `src/` (5 editados + 3 novos, preservando intocados `money.ts`, `normalizer.ts` e `file-io.ts`); diff total `git diff 0ca129b 26c5f13 --stat`: 23 arquivos, +1433/-138 linhas (incluindo os 5 arquivos de `exemplos/envelope/` e 2 novos arquivos de teste).
 
 ---
 
