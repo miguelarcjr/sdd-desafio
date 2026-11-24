@@ -1,8 +1,12 @@
 export type Cents = number;
 
-export type CategoriaElegivel = "alimentacao" | "transporte_urbano" | "hospedagem";
+export type CategoriaElegivel = string;
 
-export type StatusAvaliacao = "aprovada" | "parcial" | "recusada";
+export type StatusAvaliacao =
+  | "aprovada"
+  | "parcial"
+  | "pendente_aprovacao"
+  | "recusada";
 
 export type CodigoRegra =
   | "RN-001"
@@ -14,7 +18,10 @@ export type CodigoRegra =
   | "RN-007"
   | "RN-008"
   | "RN-009"
-  | "RN-010";
+  | "RN-010"
+  | "RN-011"
+  | "RN-012"
+  | "RN-013";
 
 export interface Colaborador {
   id: string;
@@ -35,6 +42,7 @@ export interface DespesaInput {
   descricao: string;
   fornecedor: string;
   valor: number;
+  moeda?: string;
   tem_nota_fiscal: boolean;
 }
 
@@ -49,6 +57,8 @@ export interface AvaliacaoDespesa {
   data: string;
   categoria_original: string;
   categoria_normalizada: string;
+  moeda_original: string;
+  taxa_cambio_aplicada: number | null;
   valor_original: number;
   valor_considerado: number;
   valor_reembolsado: number;
@@ -63,9 +73,11 @@ export interface ResumoLote {
   total_despesas: number;
   quantidade_aprovadas: number;
   quantidade_parciais: number;
+  quantidade_pendentes_aprovacao: number;
   quantidade_recusadas: number;
   valor_total_solicitado: number;
   valor_total_reembolsado: number;
+  valor_total_pendente_aprovacao: number;
 }
 
 export interface ResultadoLote {
