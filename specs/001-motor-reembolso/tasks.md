@@ -55,10 +55,27 @@
 
 ---
 
-## Fase 5 — Envelope (criar no Dia 2)
+## Fase 5 — Envelope (Dia 2 — Política v4 / `D-003`)
 
-<Novas tasks a partir da mudança de requisito. Numeração continua de onde parou (`T-008`...) —
-não reinicie e não renumere as antigas: a numeração é o eixo da rastreabilidade.>
+- [ ] **T-008** — Evoluir tipos de domínio e política declarativa (`src/domain/types.ts`, `src/domain/policy.ts`) para suportar categorias dinâmicas, política por centro de custo (`padrao` + `centrosCusto`, `limite == 0` inelegível) e limiar de aprovação manual (R$ 500,00)
+  - **Atende:** RN-001, RN-011, RN-013, AMB-012, AMB-013, AMB-018, D-003
+  - **Aceite:** Testes em `tests/policy.test.ts` passam cobrindo `CC-COMERCIAL` (`representacao`), `CC-ENG-PLATAFORMA` (`hospedagem: 0` inelegível), `CC-ADM` (herança de `padrao`) e `CC-SUPORTE-N2` (fallback para `padrao`)
+  - **Commit:** `<pendente>`
+
+- [ ] **T-009** — Implementar módulo puro de conversão cambial com fallback para último dia útil anterior (`src/domain/exchange.ts`)
+  - **Atende:** RN-012, AMB-014, AMB-015, D-003
+  - **Aceite:** Testes em `tests/exchange.test.ts` passam cobrindo `BRL` (taxa 1), `EUR`/`USD` em dia útil, sábado `2026-07-18` usando sexta `2026-07-17` (`5.96`), e moeda ausente `GBP` retornando `null`
+  - **Commit:** `<pendente>`
+
+- [ ] **T-010** — Integrar política por CC (`RN-011`), conversão cambial (`RN-012`), viagem internacional (`RN-005`/`AMB-017`) e fila de aprovação manual > R$ 500 (`RN-013`) no motor (`src/domain/engine.ts`)
+  - **Atende:** RN-001, RN-004, RN-005, RN-011, RN-012, RN-013, AMB-012 a AMB-018, D-003
+  - **Aceite:** Todos os testes anteriores (v3) continuam passando e os novos testes em `tests/envelope-v4.test.ts` validam 100% de `despesas-envelope.json` (`828.72` reembolsado + `600.00` pendente) e `despesas-envelope-cc-desconhecido.json` (`433.76` reembolsado)
+  - **Commit:** `<pendente>`
+
+- [ ] **T-011** — Implementar loaders externos de política e câmbio (`src/io/policy-io.ts`, `src/io/exchange-io.ts`), flags opcionais `--policy` e `--cambio` na CLI (`src/cli/index.ts`), suporte a `moeda` opcional no schema (`src/io/schema.ts`) e atualizar `README.md`
+  - **Atende:** Política v4 (Itens A e B), retrocompatibilidade da CLI v3, `D-003`
+  - **Aceite:** Testes em `tests/cli-and-io.test.ts` passam e execução real da CLI com `--policy exemplos/envelope/politica-v4.json --cambio exemplos/envelope/cambio.json` produz a saída exata esperada para ambos os arquivos do envelope
+  - **Commit:** `<pendente>`
 
 ---
 
@@ -68,24 +85,18 @@ Matriz de rastreabilidade `Regra / Ambiguidade da spec → Task → Teste`:
 
 | Regra da spec | Task | Teste |
 |---|---|---|
-| RN-001 (Categorias elegíveis) | T-003, T-006 | `tests/eliminatory-rules.test.ts`, `tests/edge-cases-and-example.test.ts` |
-| RN-002 (Limites diários agregados) | T-005, T-006 | `tests/daily-limits-and-travel.test.ts`, `tests/edge-cases-and-example.test.ts` |
-| RN-003 (Reembolso parcial por corte) | T-005, T-006 | `tests/daily-limits-and-travel.test.ts`, `tests/edge-cases-and-example.test.ts` |
-| RN-004 (Nota fiscal > R$ 100,00) | T-004, T-006 | `tests/duplicates-and-invoice.test.ts`, `tests/edge-cases-and-example.test.ts` |
-| RN-005 (Ampliação +50% em dia de viagem) | T-005, T-006 | `tests/daily-limits-and-travel.test.ts`, `tests/edge-cases-and-example.test.ts` |
+| RN-001 (Categorias elegíveis por CC) | T-003, T-006, T-008, T-010 | `tests/eliminatory-rules.test.ts`, `tests/policy.test.ts`, `tests/envelope-v4.test.ts` |
+| RN-002 (Limites diários agregados) | T-005, T-006, T-010 | `tests/daily-limits-and-travel.test.ts`, `tests/envelope-v4.test.ts` |
+| RN-003 (Reembolso parcial por corte) | T-005, T-006, T-010 | `tests/daily-limits-and-travel.test.ts`, `tests/envelope-v4.test.ts` |
+| RN-004 (Nota fiscal > R$ 100,00 em BRL) | T-004, T-006, T-010 | `tests/duplicates-and-invoice.test.ts`, `tests/envelope-v4.test.ts` |
+| RN-005 (Ampliação +50% em dia de viagem) | T-005, T-006, T-010 | `tests/daily-limits-and-travel.test.ts`, `tests/envelope-v4.test.ts` |
 | RN-006 (Período de competência) | T-003, T-006 | `tests/eliminatory-rules.test.ts`, `tests/edge-cases-and-example.test.ts` |
 | RN-007 (Detecção de duplicatas) | T-004, T-006 | `tests/duplicates-and-invoice.test.ts`, `tests/edge-cases-and-example.test.ts` |
 | RN-008 (Recusa de valores <= 0 / estornos) | T-003, T-006 | `tests/eliminatory-rules.test.ts`, `tests/edge-cases-and-example.test.ts` |
 | RN-009 (Normalização de categoria) | T-002, T-006 | `tests/money-and-normalizer.test.ts`, `tests/edge-cases-and-example.test.ts` |
 | RN-010 (Arredondamento Half-Up 2 casas) | T-002, T-006 | `tests/money-and-normalizer.test.ts`, `tests/edge-cases-and-example.test.ts` |
-| AMB-001 (Agregação diária vs por item) | T-005, T-006 | `tests/daily-limits-and-travel.test.ts` |
-| AMB-002 (Corte parcial vs saldo zerado) | T-005, T-006 | `tests/daily-limits-and-travel.test.ts` |
-| AMB-003 (1 diária por lançamento de hospedagem) | T-005, T-006 | `tests/daily-limits-and-travel.test.ts` |
-| AMB-004 (Inferência de dia em viagem +50%) | T-005, T-006 | `tests/daily-limits-and-travel.test.ts` |
-| AMB-005 (Fronteira estrita > R$ 100,00 para NF) | T-004, T-006 | `tests/duplicates-and-invoice.test.ts` |
-| AMB-006 (Chave e tratamento de duplicata) | T-004, T-006 | `tests/duplicates-and-invoice.test.ts` |
-| AMB-007 (Tratamento de estorno/valor negativo) | T-003, T-006 | `tests/eliminatory-rules.test.ts` |
-| AMB-008 (Arredondamento Half-Up de 3+ casas) | T-002, T-006 | `tests/money-and-normalizer.test.ts` |
-| AMB-009 (Case-insensitivity em categoria) | T-002, T-006 | `tests/money-and-normalizer.test.ts` |
-| AMB-010 (Datas de competência e fins de semana) | T-003, T-006 | `tests/eliminatory-rules.test.ts` |
-| AMB-011 (Ordem de precedência e não consumo de teto) | T-004, T-005, T-006 | `tests/edge-cases-and-example.test.ts` |
+| RN-011 (Política externa por centro de custo) | T-008, T-010, T-011 | `tests/policy.test.ts`, `tests/envelope-v4.test.ts`, `tests/cli-and-io.test.ts` |
+| RN-012 (Conversão cambial com fallback dia útil) | T-009, T-010, T-011 | `tests/exchange.test.ts`, `tests/envelope-v4.test.ts`, `tests/cli-and-io.test.ts` |
+| RN-013 (Fila de aprovação manual > R$ 500,00) | T-008, T-010 | `tests/envelope-v4.test.ts` |
+| AMB-001 a AMB-011 (Ambiguidades v3) | T-002 a T-006 | `tests/money-and-normalizer.test.ts` .. `tests/edge-cases-and-example.test.ts` |
+| AMB-012 a AMB-018 (Ambiguidades v4) | T-008 a T-011 | `tests/policy.test.ts`, `tests/exchange.test.ts`, `tests/envelope-v4.test.ts` |
