@@ -1,6 +1,6 @@
 # Plano Técnico — Motor de Cálculo de Reembolso
 
-**Versão:** 1.0 · **Baseado na spec:** 1.1
+**Versão:** 2.0 · **Baseado na spec:** 2.0
 
 > Aqui mora o COMO. Este arquivo pode e deve falar de linguagem, biblioteca e
 > arquitetura. O que ele **não** pode é introduzir regra de negócio nova — se
@@ -209,6 +209,12 @@ Isolar a política nessa estrutura declarativa garante que qualquer alteração 
 
 | Risco | Probabilidade | O que faço se acontecer |
 |---|---|---|
-| Mudança de requisito do Dia 2 (Envelope Lacrado) alterar limites, adicionar nova categoria ou mudar regra de viagem/duplicata | Alta (100% — faz parte do desafio) | Atualizar primeiro a `spec.md`, registrar impacto no `DECISIONS.md`, criar tasks na Fase 5 do `tasks.md` e ajustar `DEFAULT_POLICY` ou a etapa correspondente no pipeline modular de `src/domain/engine.ts`. |
-| Despesa de hospedagem aparecer depois de despesa de alimentação da mesma data no conjunto de testes oculto do avaliador | Média | Já mitigado pela `DT-002` (motor em 2 passagens: detecta todas as hospedagens válidas do lote antes de calcular os limites diários da Fase B). |
+| Mudança de requisito do Dia 2 (Envelope Lacrado) alterar limites, adicionar nova categoria ou mudar regra de viagem/duplicata | Alta (absorvido na v2.0) | Absorvido via `D-003`: `PolicyConfig` evoluído para suportar tabela externa por centro de custo (`src/domain/policy.ts`), novo módulo puro `src/domain/exchange.ts`, loaders em `src/io/` e flags opcionais `--policy` / `--cambio` na CLI preservando retrocompatibilidade total com a v3. |
+| Despesa de hospedagem aparecer depois de despesa de alimentação da mesma data no conjunto de testes oculto do avaliador | Média | Já mitigado pela `DT-002` (motor em 2 passagens: detecta todas as hospedagens e despesas em moeda estrangeira válidas do lote antes de calcular os limites diários da Fase B). |
 | Diferença de quebra de linha (CRLF vs LF) ou encoding UTF-8 ao ler/escrever JSON no Windows vs Linux/macOS | Baixa | Ler e escrever arquivos explicitamente com `encoding: "utf-8"` e formatar saída com `JSON.stringify(resultado, null, 2) + "\n"`. |
+
+## 8. Evolução Técnica v2.0 (Envelope Lacrado — `D-003`)
+
+- **Política externa (`src/domain/policy.ts` + `src/io/policy-io.ts`):** `PolicyConfig` passa a armazenar `padrao: Record<string, Cents>`, `centrosCusto: Record<string, Record<string, Cents>>`, `limiteIsencaoNotaFiscalCents`, `multiplicadorViagemPercentual` e `limiteAprovacaoAutomaticaCents` (50000 = R$ 500,00). A função `resolverLimitesParaCentroCusto(centroCusto, policy)` faz o merge `{ ...policy.padrao, ...(policy.centrosCusto[centroCusto] ?? {}) }`.
+- **Câmbio puro (`src/domain/exchange.ts` + `src/io/exchange-io.ts`):** `ExchangeRates` (`moedaBase`, `taxas: Record<string, Record<string, number>>`). A função pura `resolverTaxaCambio(data, moeda, exchange)` normaliza `moeda` (default `"BRL"` -> taxa `1`) e busca a data exata ou a maior data ISO `<= data` disponível (comparação lexicográfica consistente com `DT-003`).
+- **CLI retrocompatível (`src/cli/index.ts`):** aceita flags opcionais `--policy <politica-v4.json>` e `--cambio <cambio.json>`. Quando omitidas, usa `DEFAULT_POLICY` e sem tabela de câmbio (funcionando identicamente à v3 para lotes em BRL).
