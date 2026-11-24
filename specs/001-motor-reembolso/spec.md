@@ -1,6 +1,6 @@
 # Spec — Motor de Cálculo de Reembolso
 
-**Versão:** 1.2 · **Status:** aprovada · **Última alteração:** `2026-11-23`
+**Versão:** 2.0 · **Status:** aprovada · **Última alteração:** `2026-11-24`
 
 > **Regra de ouro deste arquivo:** ele descreve o QUÊ e o PORQUÊ. Nenhuma linha
 > aqui pode citar linguagem, biblioteca, classe, função ou estrutura de pasta.
@@ -24,7 +24,7 @@ Dado um lote de despesas de um colaborador em um período de competência, calcu
 - Não realiza persistência em banco de dados, integração com sistemas financeiros/ERP ou chamadas de rede.
 - Não realiza leitura óptica de comprovantes (OCR) nem validação criptográfica de notas fiscais (confia exclusivamente no indicador booleano `tem_nota_fiscal` da entrada).
 - Não interpreta texto livre do campo `descricao` para extrair metadados ausentes no schema (como quantidade de diárias ou cidades visitadas).
-- Não realiza conversão de moedas estrangeiras (assume todos os valores na mesma moeda corrente, Real — R$).
+- Não realiza conversão de moedas além das taxas explícitas fornecidas na tabela externa de câmbio (não consulta APIs externas de cotação em tempo real).
 - Não processa múltiplos colaboradores ou múltiplos períodos de competência em um mesmo arquivo de entrada.
 - Não altera a ordem original das despesas fornecidas na entrada.
 
@@ -46,8 +46,13 @@ Dado um lote de despesas de um colaborador em um período de competência, calcu
 | `despesas[].categoria` | Texto | Categoria informada pelo colaborador | Sim |
 | `despesas[].descricao` | Texto | Descrição livre do gasto | Sim |
 | `despesas[].fornecedor` | Texto | Nome do estabelecimento ou prestador | Sim |
-| `despesas[].valor` | Número decimal | Valor monetário submetido pelo colaborador | Sim |
+| `despesas[].valor` | Número decimal | Valor monetário submetido pelo colaborador na moeda informada | Sim |
+| `despesas[].moeda` | Texto (ISO 4217) | Código da moeda da despesa (`BRL`, `USD`, `EUR`, etc.). Quando omitido, assume-se `"BRL"` | Não |
 | `despesas[].tem_nota_fiscal` | Booleano | Indica se há nota fiscal anexada (`true` ou `false`) | Sim |
+
+**Entradas externas opcionais (Política v4):**
+- **Tabela de Política Externa (`politica-v4.json`):** define `padrao` (limites por categoria), `centros_custo` (sobrescritas e categorias específicas por `centro_custo`), `nota_fiscal_obrigatoria_acima_de` e `acrescimo_em_viagem_percentual`.
+- **Tabela de Câmbio Externa (`cambio.json`):** define `moeda_base` (`BRL`) e mapa `taxas[AAAA-MM-DD][MOEDA]` com cotações de fechamento em dias úteis.
 
 **Saída:** documento estruturado contendo os dados do colaborador e período, um resumo consolidado do lote e a lista de avaliações individuais na mesma ordem da entrada:
 
@@ -56,23 +61,27 @@ Dado um lote de despesas de um colaborador em um período de competência, calcu
 | `colaborador` | Objeto | Espelho exato do objeto `colaborador` recebido na entrada |
 | `periodo` | Objeto | Espelho exato do objeto `periodo` recebido na entrada |
 | `resumo.total_despesas` | Inteiro | Quantidade total de itens recebidos na lista `despesas` |
-| `resumo.quantidade_aprovadas` | Inteiro | Quantidade de itens com status `"aprovada"` (reembolso integral) |
-| `resumo.quantidade_parciais` | Inteiro | Quantidade de itens com status `"parcial"` (reembolso limitado ao teto) |
+| `resumo.quantidade_aprovadas` | Inteiro | Quantidade de itens com status `"aprovada"` (reembolso integral automático) |
+| `resumo.quantidade_parciais` | Inteiro | Quantidade de itens com status `"parcial"` (reembolso parcial automático) |
+| `resumo.quantidade_pendentes_aprovacao` | Inteiro | Quantidade de itens com status `"pendente_aprovacao"` (reembolsável > R$ 500,00 aguardando gestor) |
 | `resumo.quantidade_recusadas` | Inteiro | Quantidade de itens com status `"recusada"` (reembolso igual a zero) |
-| `resumo.valor_total_solicitado` | Número (2 casas) | Soma algébrica de `valor_considerado` de todas as despesas do lote |
-| `resumo.valor_total_reembolsado` | Número (2 casas) | Soma de `valor_reembolsado` de todas as despesas do lote |
+| `resumo.valor_total_solicitado` | Número (2 casas) | Soma algébrica de `valor_considerado` (em BRL) de todas as despesas convertidas do lote |
+| `resumo.valor_total_reembolsado` | Número (2 casas) | Soma de `valor_reembolsado` (em BRL) dos itens aprovados automaticamente (`"aprovada"` + `"parcial"`) |
+| `resumo.valor_total_pendente_aprovacao` | Número (2 casas) | Soma de `valor_reembolsado` (em BRL) dos itens em `"pendente_aprovacao"` |
 | `avaliacoes` | Lista de objetos | Resultado individual de cada despesa, na mesma ordem da entrada |
 | `avaliacoes[].id` | Texto | Identificador original da despesa |
 | `avaliacoes[].data` | Data (`AAAA-MM-DD`) | Data original da despesa |
 | `avaliacoes[].categoria_original` | Texto | Categoria exatamente como informada na entrada |
 | `avaliacoes[].categoria_normalizada` | Texto | Categoria após normalização (minúsculas e sem espaços extremos) |
-| `avaliacoes[].valor_original` | Número | Valor exatamente como informado na entrada |
-| `avaliacoes[].valor_considerado` | Número (2 casas) | Valor da despesa arredondado para 2 casas decimais (Half-Up) |
-| `avaliacoes[].valor_reembolsado` | Número (2 casas) | Valor efetivamente aprovado para reembolso (`>= 0.00`) |
-| `avaliacoes[].valor_glosado` | Número (2 casas) | Diferença não reembolsada (`max(0, valor_considerado - valor_reembolsado)`) |
-| `avaliacoes[].status` | Texto | Um entre: `"aprovada"`, `"parcial"`, `"recusada"` |
+| `avaliacoes[].moeda_original` | Texto | Código da moeda normalizado em maiúsculas (`"BRL"` quando ausente na entrada) |
+| `avaliacoes[].taxa_cambio_aplicada` | Número ou `null` | Taxa de câmbio aplicada na conversão para BRL (`1` para `BRL`, cotação usada para moeda estrangeira, `null` se sem cotação) |
+| `avaliacoes[].valor_original` | Número | Valor exatamente como informado na entrada na moeda original |
+| `avaliacoes[].valor_considerado` | Número (2 casas) | Valor da despesa convertido em BRL e arredondado para 2 casas decimais (Half-Up) |
+| `avaliacoes[].valor_reembolsado` | Número (2 casas) | Valor calculado para reembolso em BRL (`>= 0.00`) |
+| `avaliacoes[].valor_glosado` | Número (2 casas) | Diferença não reembolsada em BRL (`max(0, valor_considerado - valor_reembolsado)`) |
+| `avaliacoes[].status` | Texto | Um entre: `"aprovada"`, `"parcial"`, `"pendente_aprovacao"`, `"recusada"` |
 | `avaliacoes[].em_viagem` | Booleano | Indica se a data da despesa foi classificada como dia em viagem |
-| `avaliacoes[].regra_aplicada` | Texto | Código da regra determinante do resultado (`RN-001` a `RN-010`) |
+| `avaliacoes[].regra_aplicada` | Texto | Código da regra determinante do resultado (`RN-001` a `RN-013`) |
 | `avaliacoes[].justificativa` | Texto | Explicação clara em linguagem natural do motivo da decisão |
 
 ### Exemplo de saída para entrada reduzida
@@ -138,11 +147,11 @@ Para um lote com `d-001` (Alimentação, `2026-07-03`, R$ 72,50, com NF) e `d-00
 
 Cada regra recebe um ID (`RN-001` a `RN-010`). As tasks e testes referenciam esses IDs.
 
-### RN-001 — Categorias elegíveis na política
+### RN-001 — Categorias elegíveis na política (por Centro de Custo)
 
-**Regra:** Apenas as categorias normalizadas `"alimentacao"`, `"transporte_urbano"` e `"hospedagem"` são elegíveis para reembolso. Qualquer outra categoria deve ser integralmente recusada (`status = "recusada"`, `valor_reembolsado = 0.00`).
-**Origem:** Política do RH, itens 1, 2, 3 e 9.
-**Aceite:** Uma despesa com `categoria = "coworking"` e valor R$ 89,00 (`d-005`) resulta em `status = "recusada"`, `valor_reembolsado = 0.00` e `regra_aplicada = "RN-001"`.
+**Regra:** A elegibilidade de uma categoria normalizada é determinada pela tabela efetiva do `centro_custo` do colaborador (`RN-011`). Uma categoria é elegível se e somente se existir na tabela efetiva do colaborador **e** possuir `limite > 0.00`. Qualquer categoria ausente na tabela efetiva ou configurada com `limite == 0.00` (como `hospedagem` para `CC-ENG-PLATAFORMA` na política v4) deve ser integralmente recusada (`status = "recusada"`, `valor_reembolsado = 0.00`, `regra_aplicada = "RN-001"`).
+**Origem:** Política do RH v3 (item 9) atualizada pela Política v4 (Item A, `AMB-012`, `AMB-013`).
+**Aceite:** `d-005` (`coworking`) é recusada (`RN-001`); `f-003` (`representacao` para `CC-SUPORTE-N2`) é recusada (`RN-001`); `hospedagem` para `CC-ENG-PLATAFORMA` com `politica-v4.json` é recusada (`RN-001`).
 
 ### RN-002 — Limites diários agregados por categoria e data
 
@@ -168,12 +177,9 @@ Se uma despesa válida couber integralmente no saldo diário disponível da sua 
 
 ### RN-005 — Ampliação de limites em 50% em dias de viagem
 
-**Regra:** Uma data `D` é classificada como "dia em viagem" (`em_viagem = true`) se e somente se existir, na mesma data `D`, ao menos uma despesa de categoria normalizada `"hospedagem"` que tenha sido aprovada em todas as validações eliminatórias (valor positivo, dentro da competência, categoria elegível, não duplicada e com nota fiscal válida). Em uma data com `em_viagem = true`, os limites diários de todas as categorias naquela data são ampliados em 50%:
-- `"alimentacao"`: R$ 60,00 × 1,5 = **R$ 90,00**
-- `"transporte_urbano"`: R$ 80,00 × 1,5 = **R$ 120,00**
-- `"hospedagem"`: R$ 250,00 × 1,5 = **R$ 375,00**
-**Origem:** Política do RH, item 6 (`AMB-004`).
-**Aceite:** Em `2026-07-14`, `d-010` (`hospedagem`, R$ 480,00, `tem_nota_fiscal = true`) é válida, tornando `2026-07-14` um dia em viagem (`em_viagem = true`) e elevando o teto de hospedagem desse dia para R$ 375,00 (`valor_reembolsado = 375.00`, `status = "parcial"`). Em `2026-07-22`, `d-013` (`hospedagem`, R$ 690,00, `tem_nota_fiscal = false`) é recusada por falta de nota fiscal (`RN-004`), portanto `2026-07-22` não é considerado dia em viagem (`em_viagem = false`).
+**Regra:** Uma data `D` é classificada como "dia em viagem" (`em_viagem = true`) se e somente se existir, na mesma data `D`, ao menos uma despesa sobrevivente a todas as validações eliminatórias (Fase A) que seja de categoria normalizada `"hospedagem"` **ou** lançada em moeda estrangeira (`moeda_original != "BRL"`). Em uma data com `em_viagem = true`, os limites diários de todas as categorias elegíveis naquela data são ampliados pelo percentual configurado na política (`+50%`).
+**Origem:** Política do RH v3 (item 6) atualizada pela Política v4 (Item B, `AMB-004`, `AMB-017`).
+**Aceite:** Em `2026-07-14` (`despesas-envelope.json`), `e-002` (`alimentacao`, `22.00 EUR` = R$ 130,46) ativa `em_viagem = true`, elevando o limite de `alimentacao` de `CC-COMERCIAL` de R$ 90,00 para R$ 135,00 (`status = "aprovada"`, `valor_reembolsado = 130.46`). Em `2026-07-20`, `e-005` (`40.00 USD` = R$ 220,00, sem NF) falha na Fase A (`RN-004`), portanto não ativa `em_viagem`.
 
 ### RN-006 — Validação do período de competência
 
@@ -202,9 +208,32 @@ Se uma despesa válida couber integralmente no saldo diário disponível da sua 
 
 ### RN-010 — Arredondamento monetário na entrada (2 casas decimais, Half-Up)
 
-**Regra:** Todo valor monetário de entrada com mais de 2 casas decimais é arredondado imediatamente para 2 casas decimais utilizando o método *Half-Up* (meio para cima, afastando-se de zero: terceira casa decimal `>= 5` arredonda o centavo para cima; `< 5` mantém o centavo), gerando o `valor_considerado` que serve de base para todas as regras subsequentes.
+**Regra:** Todo valor monetário (original em BRL ou após conversão cambial para BRL) com mais de 2 casas decimais é arredondado para 2 casas decimais utilizando o método *Half-Up* (meio para cima, afastando-se de zero: terceira casa decimal `>= 5` arredonda o centavo para cima; `< 5` mantém o centavo), gerando o `valor_considerado` em BRL que serve de base para todas as regras subsequentes.
 **Origem:** Cruzamento da Política do RH com os dados de entrada (`AMB-008`).
 **Aceite:** `d-011` com `valor = 33.333` tem `valor_considerado = 33.33` e `valor_reembolsado = 33.33`.
+
+### RN-011 — Resolução de política externa por Centro de Custo
+
+**Regra:** Os limites diários e categorias elegíveis são carregados a partir de uma política externa (ex.: `politica-v4.json`), resolvida para o `colaborador.centro_custo`:
+- Se o `centro_custo` não existir em `centros_custo`, utiliza-se integralmente o mapa `padrao`.
+- Se o `centro_custo` existir em `centros_custo`, a tabela efetiva mescla `padrao` com as entradas do `centro_custo` (sobrescrevendo categorias presentes no CC e adicionando novas categorias como `representacao`, enquanto categorias com `limite == 0.00` tornam-se explicitamente não reembolsáveis).
+- Quando nenhuma política externa é fornecida na CLI, utiliza-se a política padrão embutida equivalente à v3 (`alimentacao: 60`, `transporte_urbano: 80`, `hospedagem: 250`).
+**Origem:** Política do RH v4, Item A (`AMB-012`, `AMB-013`).
+**Aceite:** `CC-COMERCIAL` reconhece `representacao` (limite R$ 300,00) e `alimentacao` (R$ 90,00); `CC-SUPORTE-N2` usa `padrao` (rejeitando `representacao` em `f-003`); `CC-ENG-PLATAFORMA` recusa `hospedagem` por ter `limite == 0.00`; `CC-ADM` herda `hospedagem: 250.00` de `padrao` mantendo `alimentacao: 45.00` e `transporte_urbano: 60.00`.
+
+### RN-012 — Conversão cambial de despesas em moeda estrangeira
+
+**Regra:** Quando o campo `moeda` está ausente na despesa, assume-se `"BRL"` (taxa `1`). Quando `moeda` (normalizada em maiúsculas) difere de `"BRL"`, o valor original é multiplicado pela taxa da data da despesa na tabela externa de câmbio (`cambio.json`) e arredondado via *Half-Up* (`RN-010`) antes da validação de nota fiscal (`RN-004`) e da aplicação dos limites diários (`RN-002`):
+- Se a data exata da despesa não constar na tabela de câmbio (ex.: fim de semana ou feriado bancário), utiliza-se a cotação do **último dia útil anterior disponível** na tabela.
+- Se não existir nenhuma data `<= despesa.data` na tabela, ou se a moeda solicitada não estiver cotada na data resolvida (ex.: `GBP`), ou se nenhuma tabela de câmbio tiver sido fornecida, a despesa é recusada (`status = "recusada"`, `valor_considerado = 0.00`, `valor_reembolsado = 0.00`, `taxa_cambio_aplicada = null`, `regra_aplicada = "RN-012"`).
+**Origem:** Política do RH v4, Item B (`AMB-014`, `AMB-015`, `AMB-016`).
+**Aceite:** `e-004` (`2026-07-18`, sábado, `30.00 EUR`) usa a taxa de `2026-07-17` (`5.96`), convertendo para `178.80 BRL`; `e-005` (`40.00 USD` × `5.50` = `220.00 BRL`, sem NF) falha em `RN-004`; `e-006` (`55.00 GBP`) falha em `RN-012` por ausência de cotação para `GBP`.
+
+### RN-013 — Fila de aprovação manual acima de R$ 500,00 (Item C)
+
+**Regra:** Após o cálculo do valor reembolsável na Fase B, se o `valor_reembolsado` de uma despesa for **estritamente maior que R$ 500,00** (`valor_reembolsado > 500.00`), a despesa não é aprovada automaticamente: ela recebe `status = "pendente_aprovacao"`, `regra_aplicada = "RN-013"`, mantém o `valor_reembolsado` e `valor_glosado` calculados e tem seu valor contabilizado em `resumo.valor_total_pendente_aprovacao` (e `resumo.quantidade_pendentes_aprovacao`), sem compor `resumo.valor_total_reembolsado` (que reflete apenas aprovações automáticas). O consumo do saldo diário da categoria na Fase B continua ocorrendo normalmente.
+**Origem:** Política do RH v4, Item C (`AMB-018`).
+**Aceite:** Em `despesas-envelope.json`, `e-007` (`hospedagem`, `CC-COMERCIAL`, R$ 1.200,00 com NF em dia de viagem -> teto R$ 600,00) resulta em `valor_reembolsado = 600.00`, `valor_glosado = 600.00`, `status = "pendente_aprovacao"` e `regra_aplicada = "RN-013"`.
 
 ---
 
@@ -294,9 +323,65 @@ Se uma despesa válida couber integralmente no saldo diário disponível da sua 
 
 **Texto original do RH:** A política lista 9 itens sem definir qual regra é verificada primeiro quando uma despesa infringe mais de uma condição (por exemplo, `d-004` custa R$ 100,01 em transporte: viola simultaneamente a falta de nota fiscal acima de R$ 100 e o teto diário de R$ 80).
 **O que não está claro:** Se `d-004` deve ser recusada por falta de nota fiscal (`RN-004`) ou reembolsada parcialmente até R$ 80 por exceder o limite (`RN-003`), e se itens recusados por falta de NF, duplicidade ou fora de competência consomem o limite diário da categoria.
-**Decisão:** As regras eliminatórias de validade (valor positivo → competência → categoria → duplicidade → nota fiscal) são executadas antes do cálculo de limite diário, e despesas recusadas em qualquer etapa eliminatória nunca consomem o limite diário nem ativam status de viagem.
-**Justificativa:** Uma despesa inválida (sem comprovante fiscal exigido, duplicada ou fora de competência) não existe juridicamente para fins de reembolso, não podendo receber reembolso parcial nem consumir o limite de despesas válidas.
-**Regra afetada:** RN-001 a RN-010 (Seção 8)
+**Decisão:** As regras eliminatórias de validade (conversão cambial → valor positivo → competência → categoria → duplicidade → nota fiscal) são executadas antes do cálculo de limite diário, e despesas recusadas em qualquer etapa eliminatória nunca consomem o limite diário nem ativam status de viagem.
+**Justificativa:** Uma despesa inválida (sem cotação cambial, sem comprovante fiscal exigido, duplicada ou fora de competência) não existe juridicamente para fins de reembolso, não podendo receber reembolso parcial nem consumir o limite de despesas válidas.
+**Regra afetada:** RN-001 a RN-013 (Seção 8)
+
+### AMB-012 — Herança de política `padrao` em centro de custo parcialmente especificado (`CC-ADM`) vs. CC desconhecido (`CC-SUPORTE-N2`)
+
+**Texto original do RH (v4):** "Alguns centros de custo não têm entrada na tabela. Nesse caso, aplica-se a política padrão." (E `politica-v4.json` lista `CC-ADM` com `alimentacao` e `transporte_urbano`, omitindo `hospedagem`, enquanto `CC-ENG-PLATAFORMA` coloca `hospedagem` explicitamente com `limite: 0.00`).
+**O que não está claro:** Se um CC listado na tabela que omite uma categoria padrão (`CC-ADM` sem `hospedagem`) herda o limite de `padrao` ou passa a proibir a categoria omitida.
+**Decisão:** A política efetiva de um CC listado é a fusão de `padrao` com as sobrescritas daquele CC (`{ ...padrao, ...centros_custo[cc] }`). Para desabilitar uma categoria padrão, o CC deve declarar `limite: 0.00` (como faz `CC-ENG-PLATAFORMA`). Para CCs ausentes (`CC-SUPORTE-N2`), aplica-se integralmente `padrao`.
+**Justificativa:** O próprio arquivo `politica-v4.json` demonstra a convenção do financeiro de usar `limite: 0.00` para proibir explicitamente uma categoria, logo omissão em um CC significa manter o padrão corporativo.
+**Regra afetada:** RN-001, RN-011
+
+### AMB-013 — Categoria configurada com `limite: 0.00` (`CC-ENG-PLATAFORMA` + `hospedagem`)
+
+**Texto original do RH (v4):** "`CC-ENG-PLATAFORMA` não reembolsa `hospedagem` de forma alguma." (`"hospedagem": { "limite": 0.00, "observacao": "nao reembolsavel" }`).
+**O que não está claro:** Se uma despesa em categoria com `limite == 0.00` deve ser barrada já na Fase A como não elegível (`RN-001`) ou chegar à Fase B (onde uma hospedagem poderia ativar indevidamente `em_viagem = true`).
+**Decisão:** Categorias com `limite <= 0.00` na política efetiva do CC são tratadas como inelegíveis já na etapa 4 da Fase A (`RN-001`), recebendo `status = "recusada"` e nunca ativando `em_viagem`.
+**Justificativa:** Se o CC não reembolsa hospedagem "de forma alguma", ela não pode ser aceita na Fase A nem servir de gatilho para ampliar outros limites.
+**Regra afetada:** RN-001, RN-005, RN-011
+
+### AMB-014 — Cotação de câmbio em fins de semana ou datas sem publicação (`e-004`, sábado `2026-07-18`)
+
+**Texto original do RH (v4):** "A conversão usa a taxa da data da despesa, não a taxa de hoje. As taxas estão em `cambio.json`." (`cambio.json`: "Cotacoes publicadas apenas em dias uteis bancarios.")
+**O que não está claro:** Como converter uma despesa em moeda estrangeira ocorrida no sábado (`2026-07-18`, `e-004`), data inexistente no mapa `taxas` de `cambio.json`.
+**Decisão:** Quando a data exata não existe em `cambio.json`, aplica-se a cotação do último dia útil anterior disponível (`<= despesa.data`, isto é, sexta-feira `2026-07-17` para o sábado `2026-07-18`).
+**Justificativa:** É a convenção contábil e bancária oficial do Banco Central (PTAX) para operações em dias não úteis.
+**Regra afetada:** RN-012
+
+### AMB-015 — Moeda estrangeira ausente na tabela de câmbio (`e-006`, `GBP`)
+
+**Texto original do RH (v4):** "As taxas estão em `cambio.json`." (Mas `despesas-envelope.json` traz `e-006` em `GBP`, moeda inexistente em `cambio.json`).
+**O que não está claro:** Se o motor deve abortar o lote inteiro com erro ou recusar apenas a despesa sem cotação disponível.
+**Decisão:** Recusar apenas a despesa cuja moeda não possui cotação disponível (`status = "recusada"`, `regra_aplicada = "RN-012"`, `taxa_cambio_aplicada = null`, `valor_considerado = 0.00`), preservando o processamento determinístico das demais despesas do lote.
+**Justificativa:** Um único item sem taxa cadastrada não deve bloquear o reembolso das demais despesas legítimas do colaborador.
+**Regra afetada:** RN-012
+
+### AMB-016 — Momento da validação de Nota Fiscal (> R$ 100,00) para despesas em moeda estrangeira (`e-003`, `e-005`)
+
+**Texto original do RH (v4):** "Os limites da política são sempre em BRL. Uma despesa em EUR é convertida antes de ser comparada ao limite."
+**O que não está claro:** Se o teto de isenção de Nota Fiscal (R$ 100,00) também compara o valor já convertido para BRL (fazendo `e-003` de 14,50 EUR = R$ 85,26 dispensar NF e `e-005` de 40,00 USD = R$ 220,00 exigir NF).
+**Decisão:** A conversão cambial ocorre no pré-processamento (antes das regras eliminatórias), portanto `RN-004` sempre compara o `valor_considerado` já convertido em BRL contra `nota_fiscal_obrigatoria_acima_de` (R$ 100,00).
+**Justificativa:** Todos os limiares monetários da política são expressos em BRL; comparar o valor nominal em moeda estrangeira violaria a equivalência financeira.
+**Regra afetada:** RN-004, RN-012
+
+### AMB-017 — Despesas internacionais e caracterização de "dia em viagem" (+50%)
+
+**Texto original do RH (v4):** "Colaboradores em viagem internacional lançam despesas em moeda estrangeira."
+**O que não está claro:** Se uma despesa válida em moeda estrangeira (`moeda != "BRL"`) na data `D` também caracteriza que o colaborador está em viagem naquele dia (`em_viagem = true`), mesmo sem lançamento de hospedagem na mesma data (`e-002`, `e-003`, `e-004`, `f-004`).
+**Decisão:** Sim. Na v2.0, uma data `D` recebe `em_viagem = true` se houver ao menos uma despesa sobrevivente à Fase A de categoria `"hospedagem"` **ou** com `moeda_original != "BRL"`.
+**Justificativa:** Uma despesa válida em moeda estrangeira é evidência objetiva de viagem internacional naquela data, harmonizando o item 6 da v3 com o item B da v4.
+**Regra afetada:** RN-005
+
+### AMB-018 — Contabilização e fronteira da fila de aprovação manual (Item C, > R$ 500,00)
+
+**Texto original do RH (v4):** "Itens cujo valor reembolsável passe de R$ 500 não são mais aprovados automaticamente. Eles entram em estado de pendência aguardando aprovação do gestor."
+**O que não está claro:** Se o limite de R$ 500,00 é estrito (`> 500.00`), se compara o `valor_original` ou o `valor_reembolsado` final, e se valores pendentes entram no `valor_total_reembolsado` do resumo.
+**Decisão:** A condição é estritamente `valor_reembolsado > 500.00` (sobre o valor reembolsável calculado após teto diário). Itens nessa condição recebem `status = "pendente_aprovacao"` e `regra_aplicada = "RN-013"`, e são somados separadamente em `resumo.valor_total_pendente_aprovacao` (sem inflar `resumo.valor_total_reembolsado`, que representa o total já liberado automaticamente).
+**Justificativa:** O financeiro precisa distinguir com clareza o montante liberado para pagamento imediato daquele retido aguardando alçada do gestor.
+**Regra afetada:** RN-013
 
 ---
 
@@ -316,6 +401,13 @@ Se uma despesa válida couber integralmente no saldo diário disponível da sua 
 | Valor com 3 casas decimais | `d-011` (`alimentacao`, R$ 33,333) | Arredondado Half-Up para `33.33`; aprovado em R$ 33,33 (`RN-010`, `RN-002`) | RN-010, RN-002 |
 | Despesa em sábado dentro do período | `d-012` (`2026-07-18`, sábado, R$ 47,20) | Aprovada integralmente em R$ 47,20 (`RN-006`, `RN-002`) | RN-006, RN-002 |
 | Categoria em letras maiúsculas | `d-014` (`"ALIMENTACAO"`, R$ 61,00) | Normalizada para `"alimentacao"`; reembolsada parcialmente em R$ 60,00 (`RN-009`, `RN-003`) | RN-009, RN-003 |
+| Categoria específica de CC (`representacao` em `CC-COMERCIAL`) | `e-001` (`CC-COMERCIAL`, R$ 340,00) | Limite de R$ 300,00; reembolsada parcialmente em R$ 300,00 (`RN-011`, `RN-003`) | RN-011, RN-003 |
+| Categoria exclusiva de outro CC em CC desconhecido | `f-003` (`CC-SUPORTE-N2`, `representacao`, R$ 190,00) | Usa política `padrao` (sem `representacao`); recusada por `RN-001` | RN-011, RN-001 |
+| Categoria com `limite: 0.00` no CC | `hospedagem` em `CC-ENG-PLATAFORMA` (com `politica-v4.json`) | Recusada por `RN-001` na Fase A; não ativa `em_viagem` | RN-011, RN-001 |
+| Despesa internacional em sábado (sem cotação na data) | `e-004` (`2026-07-18`, `30.00 EUR`, NF=true) | Fallback para sexta `2026-07-17` (`5.96`) → `178.80 BRL`; ativa viagem (`135.00` teto); parcial `135.00` | RN-012, RN-005, RN-003 |
+| Despesa internacional em moeda sem cotação | `e-006` (`2026-07-21`, `55.00 GBP`) | Recusada por ausência de cotação (`RN-012`, `taxa_cambio_aplicada = null`) | RN-012 |
+| Despesa internacional sem NF abaixo vs. acima de R$ 100 após conversão | `e-003` (`14.50 EUR` = R$ 85,26) e `e-005` (`40.00 USD` = R$ 220,00) | `e-003` dispensa NF e é aprovada (`85.26`); `e-005` exige NF e é recusada (`RN-004`) | RN-012, RN-004 |
+| Item com valor reembolsável > R$ 500,00 (Item C) | `e-007` (`CC-COMERCIAL`, `hospedagem`, R$ 1.200,00, NF=true) | Dia em viagem (+50% → teto R$ 600,00); como `600.00 > 500.00`, `status = "pendente_aprovacao"` (`RN-013`) | RN-005, RN-013 |
 
 ---
 
@@ -323,21 +415,23 @@ Se uma despesa válida couber integralmente no saldo diário disponível da sua 
 
 A ordem de avaliação é estrita e determinística, dividida em duas fases sobre o lote:
 
-### Fase A — Pré-processamento e Validações Eliminatórias (por item, na ordem da entrada)
+### Fase A — Pré-processamento, Câmbio e Validações Eliminatórias (por item, na ordem da entrada)
 Para cada despesa:
-1. **Normalização e Arredondamento (`RN-009`, `RN-010`):** normaliza `categoria` (`trim` + minúsculas) e calcula `valor_considerado` arredondado para 2 casas decimais (*Half-Up*).
+1. **Normalização, Câmbio e Arredondamento (`RN-009`, `RN-010`, `RN-012`):** normaliza `categoria` (`trim` + minúsculas) e `moeda` (ausente → `"BRL"`, senão `trim` + maiúsculas). Se `moeda != "BRL"`, resolve a taxa da data (ou último dia útil anterior) na tabela externa de câmbio; se indisponível → **RECUSA** (`RN-012`). Converte `valor * taxa` e calcula `valor_considerado` em BRL arredondado para 2 casas decimais (*Half-Up*).
 2. **Valor Positivo (`RN-008`):** se `valor_considerado <= 0.00` → **RECUSA** (`RN-008`). Para aqui.
 3. **Período de Competência (`RN-006`):** se `data < periodo.inicio` ou `data > periodo.fim` → **RECUSA** (`RN-006`). Para aqui.
-4. **Categoria Elegível (`RN-001`):** se `categoria_normalizada` não estiver em `{"alimentacao", "transporte_urbano", "hospedagem"}` → **RECUSA** (`RN-001`). Para aqui.
-5. **Duplicidade (`RN-007`):** para despesas que passaram pelas etapas 2, 3 e 4, constrói-se a chave `(data, categoria_normalizada, fornecedor_normalizado, descricao_normalizada, valor_considerado)` (com colapso de espaços internos múltiplos e minúsculas). Se a chave já tiver sido registrada anteriormente no lote → **RECUSA** (`RN-007`). Para aqui. Caso contrário, registra a chave na tabela de duplicatas vistas e avança para a etapa 6.
-6. **Nota Fiscal Obrigatória (`RN-004`):** se `valor_considerado > 100.00` e `tem_nota_fiscal == false` → **RECUSA** (`RN-004`). Para aqui.
+4. **Categoria Elegível no Centro de Custo (`RN-001`, `RN-011`):** consulta a política efetiva do `colaborador.centro_custo`. Se `categoria_normalizada` não existir ou tiver `limite <= 0.00` → **RECUSA** (`RN-001`). Para aqui.
+5. **Duplicidade (`RN-007`):** para despesas que passaram pelas etapas 1 a 4, constrói-se a chave `(data, categoria_normalizada, fornecedor_normalizado, descricao_normalizada, valor_considerado)` (com colapso de espaços internos múltiplos e minúsculas). Se a chave já tiver sido registrada anteriormente no lote → **RECUSA** (`RN-007`). Para aqui. Caso contrário, registra a chave na tabela de duplicatas vistas e avança para a etapa 6.
+6. **Nota Fiscal Obrigatória (`RN-004`):** se `valor_considerado > nota_fiscal_obrigatoria_acima_de` (R$ 100,00) e `tem_nota_fiscal == false` → **RECUSA** (`RN-004`). Para aqui.
 
-### Fase B — Determinação de Dias em Viagem e Aplicação de Limites Diários
-7. **Identificação de Dias em Viagem (`RN-005`):** todas as datas `D` que possuem ao menos uma despesa de `categoria_normalizada == "hospedagem"` sobrevivente à Fase A são marcadas com `em_viagem = true`. As demais datas do período têm `em_viagem = false` (o campo `em_viagem` é preenchido em todas as avaliações daquela data `D`).
-8. **Consumo de Limite Diário e Reembolso Parcial (`RN-002`, `RN-003`):** para cada despesa que sobreviveu à Fase A (na ordem original da entrada), consulta-se o saldo restante de `(data, categoria_normalizada)` (inicializado com o limite base ou o limite ampliado em +50% se `em_viagem == true` naquela data):
+### Fase B — Determinação de Dias em Viagem, Limites Diários e Fila de Aprovação
+7. **Identificação de Dias em Viagem (`RN-005`):** todas as datas `D` que possuem ao menos uma despesa sobrevivente à Fase A de `categoria_normalizada == "hospedagem"` **ou** com `moeda_original != "BRL"` são marcadas com `em_viagem = true`. As demais datas do período têm `em_viagem = false`.
+8. **Consumo de Limite Diário, Reembolso Parcial e Pendência Manual (`RN-002`, `RN-003`, `RN-013`):** para cada despesa sobrevivente à Fase A (na ordem original), consulta-se o saldo restante de `(data, categoria_normalizada)` (inicializado com o limite da política efetiva do CC, ampliado em `+acrescimo_em_viagem_percentual` se `em_viagem == true`):
    - Se `saldo_restante == 0.00` → **RECUSA** (`RN-002`, `valor_reembolsado = 0.00`).
-   - Se `valor_considerado <= saldo_restante` → **APROVAÇÃO INTEGRAL** (`RN-002`, `valor_reembolsado = valor_considerado`, reduz `saldo_restante`).
-   - Se `valor_considerado > saldo_restante` (com `saldo_restante > 0.00`) → **APROVAÇÃO PARCIAL** (`RN-003`, `valor_reembolsado = saldo_restante`, `saldo_restante` passa a `0.00`).
+   - Caso contrário, calcula `valor_reembolsado = min(valor_considerado, saldo_restante)` e atualiza `saldo_restante`.
+   - Se `valor_reembolsado > 500.00` → **PENDENTE DE APROVAÇÃO** (`status = "pendente_aprovacao"`, `regra_aplicada = "RN-013"`).
+   - Senão, se `valor_considerado <= saldo_restante_anterior` → **APROVAÇÃO INTEGRAL** (`status = "aprovada"`, `regra_aplicada = "RN-002"`).
+   - Senão → **APROVAÇÃO PARCIAL** (`status = "parcial"`, `regra_aplicada = "RN-003"`).
 
 ---
 
@@ -345,11 +439,11 @@ Para cada despesa:
 
 O sistema está pronto quando:
 
-- [ ] Processa o arquivo `exemplos/despesas-exemplo.json` via linha de comando (`calcular --input ... --output ...`) gerando um arquivo JSON válido com 14 avaliações na mesma ordem da entrada.
-- [ ] Produz para `exemplos/despesas-exemplo.json` exatamente: 3 despesas `"aprovada"` (`d-006`, `d-011`, `d-012`), 4 despesas `"parcial"` (`d-001`, `d-003`, `d-010`, `d-014`) e 7 despesas `"recusada"` (`d-002`, `d-004`, `d-005`, `d-007`, `d-008`, `d-009`, `d-013`).
-- [ ] Produz para `exemplos/despesas-exemplo.json` o `valor_total_reembolsado` exato de **710.43** (`60.00 + 80.00 + 54.90 + 375.00 + 33.33 + 47.20 + 60.00`) e `valor_total_solicitado` exato de **1816.84**.
-- [ ] Cada uma das 10 regras de negócio (`RN-001` a `RN-010`) e cada uma das 11 ambiguidades (`AMB-001` a `AMB-011`) possui ao menos um teste automatizado dedicado verificando seu comportamento e código de regra.
-- [ ] Nenhum cálculo monetário apresenta erro de precisão de ponto flutuante (todos os valores monetários de saída possuem precisão exata de até 2 casas decimais).
+- [ ] Processa `exemplos/despesas-exemplo.json` (sem `--policy` externo, retrocompatível com v3) gerando 3 `"aprovada"`, 4 `"parcial"`, 0 `"pendente_aprovacao"`, 7 `"recusada"`, `valor_total_solicitado = 1816.84` e `valor_total_reembolsado = 710.43`.
+- [ ] Processa `exemplos/envelope/despesas-envelope.json` com `--policy exemplos/envelope/politica-v4.json --cambio exemplos/envelope/cambio.json` gerando exatamente: 3 `"aprovada"` (`e-002`, `e-003`, `e-010`), 3 `"parcial"` (`e-001`, `e-004`, `e-008`), 1 `"pendente_aprovacao"` (`e-007` = `600.00`), 3 `"recusada"` (`e-005`, `e-006`, `e-009`), `valor_total_reembolsado = 828.72` e `valor_total_pendente_aprovacao = 600.00`.
+- [ ] Processa `exemplos/envelope/despesas-envelope-cc-desconhecido.json` com `politica-v4.json` e `cambio.json` gerando exatamente: 3 `"aprovada"` (`f-001` = `58.00`, `f-002` = `310.00`, `f-004` = `65.76`), 1 `"recusada"` (`f-003` `representacao` fora da política `padrao`), `valor_total_reembolsado = 433.76`.
+- [ ] Cada uma das 13 regras de negócio (`RN-001` a `RN-013`) e cada uma das 18 ambiguidades (`AMB-001` a `AMB-018`) possui testes automatizados dedicados passando.
+- [ ] Nenhum cálculo monetário ou conversão cambial apresenta erro de precisão de ponto flutuante.
 
 ## 10. O que fica em aberto
 

@@ -10,6 +10,30 @@ Ordem cronológica inversa: a mais recente primeiro.
 
 ---
 
+## D-003 — Absorção do Envelope Lacrado (Política de Reembolso v4: política externa por CC, câmbio e fila > R$ 500) · `2026-11-24`
+
+**Gatilho:** Envelope lacrado do Dia 2 (`exemplos/envelope/00-ENVELOPE-LACRADO.md`), introduzindo política externa por centro de custo (`politica-v4.json`), despesas em moeda estrangeira com tabela de câmbio (`cambio.json`) e fila de aprovação manual acima de R$ 500,00 (Item C).
+
+**O que mudou na spec:**
+- **De (`spec.md` v1.2):** Lista fechada de 3 categorias fixas (`RN-001`), apenas moeda `BRL` (Seção 3), `em_viagem` ativado apenas por `hospedagem` válida (`RN-005`), e 3 estados de avaliação (`aprovada`, `parcial`, `recusada`).
+- **Para (`spec.md` v2.0):**
+  - Adicionadas regras `RN-011` (política externa por `centro_custo` com herança de `padrao` e bloqueio de `limite == 0.00`), `RN-012` (conversão cambial por data com fallback para o último dia útil anterior e recusa de moeda sem cotação) e `RN-013` (status `pendente_aprovacao` para `valor_reembolsado > 500.00` contabilizado separadamente em `resumo.valor_total_pendente_aprovacao`).
+  - Atualizadas `RN-001` (categorias dinâmicas por CC), `RN-005` (`em_viagem` também ativado por despesa válida em moeda estrangeira), Seção 3 (Fora de escopo) e Seção 4 (novos campos `moeda_original`, `taxa_cambio_aplicada`, `quantidade_pendentes_aprovacao`, `valor_total_pendente_aprovacao`).
+  - Registradas 7 novas ambiguidades (`AMB-012` a `AMB-018`).
+
+**Por quê:** A Política v4 revogou a tabela única da v3 e passou a exigir parametrização externa mantida pelo financeiro, suporte a despesas internacionais convertidas pela PTAX da data e alçada de aprovação manual acima de R$ 500,00.
+
+**O que isso invalidou:**
+- O tipo fechado `CategoriaElegivel = "alimentacao" | "transporte_urbano" | "hospedagem"` em `src/domain/types.ts` (agora categorias são strings dinâmicas definidas pela política externa, como `"representacao"`).
+- O item da Seção 3 da `spec.md` que colocava conversão de moedas fora de escopo.
+- Testes de contrato que comparavam o objeto `resumo` exato precisaram incluir os novos campos `quantidade_pendentes_aprovacao: 0` e `valor_total_pendente_aprovacao: 0` (mantendo 100% dos valores e comportamentos da v3 retrocompatíveis).
+
+**Tasks afetadas:** Criadas novas tasks na Fase 5 de `tasks.md`: `T-008`, `T-009`, `T-010` e `T-011`.
+
+**Custo:** Será medido e reportado no `RELATORIO.md` após a conclusão das tasks `T-008` a `T-011`.
+
+---
+
 ## D-002 — Correção do valor esperado de `valor_total_solicitado` na Seção 9 (`exemplos/despesas-exemplo.json`) · `2026-11-23`
 
 **Gatilho:** Falha no teste de contrato `T-006` (`tests/edge-cases-and-example.test.ts`), que calculou `1816.84` contra `1817.84` documentado na Seção 9 da `spec.md`.
