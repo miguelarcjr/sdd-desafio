@@ -42,6 +42,14 @@ function validarDespesa(raw: unknown, index: number): DespesaInput {
     throw new Error(`Campo obrigatorio '${contexto}.tem_nota_fiscal' deve ser booleano.`);
   }
 
+  let moeda: string | undefined;
+  if (raw.moeda !== undefined) {
+    if (typeof raw.moeda !== "string" || raw.moeda.trim().length === 0) {
+      throw new Error(`Campo opcional '${contexto}.moeda' deve ser uma string nao vazia quando informado.`);
+    }
+    moeda = raw.moeda;
+  }
+
   return {
     id,
     data,
@@ -49,6 +57,7 @@ function validarDespesa(raw: unknown, index: number): DespesaInput {
     descricao,
     fornecedor,
     valor: raw.valor,
+    ...(moeda !== undefined ? { moeda } : {}),
     tem_nota_fiscal: raw.tem_nota_fiscal,
   };
 }

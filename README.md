@@ -19,10 +19,20 @@ npm install
 
 ## Como rodar
 
-Execute o comando `calcular` informando o arquivo JSON de entrada e o caminho do arquivo JSON de saída:
+### Modo padrão (Política v3 embutida — retrocompatível)
 
 ```bash
 npm run reembolso -- calcular --input exemplos/despesas-exemplo.json --output resultado.json
+```
+
+### Modo Política v4 (política externa por centro de custo + tabela de câmbio)
+
+```bash
+npm run reembolso -- calcular \
+  --input exemplos/envelope/despesas-envelope.json \
+  --output resultado-envelope.json \
+  --policy exemplos/envelope/politica-v4.json \
+  --cambio exemplos/envelope/cambio.json
 ```
 
 *(O script `reembolso` executa `tsx src/cli/index.ts`.)*
